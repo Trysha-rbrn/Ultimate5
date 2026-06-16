@@ -112,9 +112,10 @@
   .role-chip .ico { font-size: 13px; }
 
   /* Draft layout */
-  .draft-grid { display: grid; gap: 16px; }
+  .draft-grid { display: grid; gap: 16px; align-items: start; }
   @media (min-width: 920px) {
     .draft-grid { grid-template-columns: 320px 1fr; }
+    .app { padding-top: 48px; }
   }
   .stack { display: flex; flex-direction: column; gap: 14px; }
 
@@ -128,6 +129,10 @@
     min-height: 56px;
   }
   .slot.filled { border-style: solid; background: linear-gradient(180deg, #182040, #131a30); border-color: var(--line); }
+  .slot[draggable="true"] { cursor: grab; }
+  .slot.dragging { opacity: 0.5; }
+  .slot.selected { border-style: solid; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,101,104,0.35); }
+  .slot.drop-ok { border-style: dashed; border-color: var(--accent); }
   .slot .role-ico {
     width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center;
     background: var(--panel-2); border: 1px solid var(--line); font-size: 18px;
@@ -160,12 +165,17 @@
   /* Roll display */
   .roll-card { padding: 18px; }
   .roll-title { font-size: 12px; color: var(--fg-mute); letter-spacing: 1px; text-transform: uppercase; }
-  .roll-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; justify-content: center; }
+  .roll-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; min-height: 34px; }
+  .roll-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; }
+  .spin-actions {
+    width: 100%; max-width: 520px; min-height: 96px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  }
 
   /* ---- SPIN reel (82-0 style slot machine) ---- */
   .spin-stage { display: grid; gap: 14px; place-items: center; padding: 8px 0 4px; }
   .reels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; max-width: 520px; }
-  @media (max-width: 480px) { .reels { grid-template-columns: 1fr; } }
+  @media (max-width: 480px) { .reels, .roll-actions { grid-template-columns: 1fr; } }
   .reel {
     position: relative; overflow: hidden;
     background: radial-gradient(120% 120% at 50% 0%, rgba(228,0,20,0.10), transparent 60%), var(--bg-2);
@@ -181,6 +191,7 @@
   .reel .reel-flag { font-size: 38px; line-height: 1; }
   .reel .reel-value {
     font-weight: 900; font-size: 22px; letter-spacing: -0.4px; color: var(--fg);
+    white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
   }
   .reel.year .reel-value { font-family: var(--font-mono); font-size: 30px; }
   .reel .reel-value.placeholder { color: var(--fg-mute); }
@@ -211,7 +222,11 @@
   .btn-spin[disabled] { opacity: 0.7; cursor: default; }
 
   /* Player list */
-  .player-list { padding: 6px; display: grid; gap: 6px; }
+  .player-list { padding: 6px; display: grid; gap: 6px; align-content: start; max-height: 460px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .player-list::-webkit-scrollbar { width: 10px; }
+  .player-list::-webkit-scrollbar-track { background: transparent; }
+  .player-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: var(--radius-pill); border: 2px solid var(--panel); }
+  .player-list::-webkit-scrollbar-thumb:hover { background: var(--fg-mute); }
   .player-row {
     display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px;
     padding: 12px; border-radius: 10px;
@@ -235,14 +250,8 @@
   }
   .player-row.disabled { opacity: 0.45; cursor: not-allowed; }
   .player-row.disabled:hover { background: var(--bg-2); border-color: var(--line); }
+  .player-row.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,101,104,0.35); }
 
-  /* Role-pick prompt */
-  .role-pick {
-    margin-top: 8px; padding: 12px;
-    border-radius: 10px; background: var(--bg-2); border: 1px solid var(--brand);
-  }
-  .role-pick .label { font-size: 12px; color: var(--brand); letter-spacing: 0.5px; text-transform: uppercase; font-weight: 800; margin-bottom: 8px; }
-  .role-pick .opts { display: flex; gap: 8px; flex-wrap: wrap; }
 
   /* Empty state for no matches */
   .no-players { padding: 24px; text-align: center; color: var(--fg-sub); }
@@ -1867,11 +1876,11 @@ const SLOTS = [
 
 const STAGES = [
   { name: 'Stage 1', desc: 'Challengers Stage — 16 teams, 9 advance.', difficulty: 0.95 },
-  { name: 'Stage 2', desc: 'Legends Stage — 16 teams, 8 advance.',     difficulty: 1.05 },
-  { name: 'Stage 3', desc: 'Champions Stage — 8 teams, single-elim.',  difficulty: 1.10 },
-  { name: 'Quarterfinals', desc: 'Best of 3.', difficulty: 1.13 },
-  { name: 'Semifinals',    desc: 'Best of 3.', difficulty: 1.16 },
-  { name: 'Grand Final',   desc: 'Best of 5.', difficulty: 1.18 },
+  { name: 'Stage 2', desc: 'Legends Stage — 16 teams, 8 advance.',     difficulty: 1.00 },
+  { name: 'Stage 3', desc: 'Champions Stage — 8 teams, single-elim.',  difficulty: 1.05 },
+  { name: 'Quarterfinals', desc: 'Best of 3.', difficulty: 1.10 },
+  { name: 'Semifinals',    desc: 'Best of 3.', difficulty: 1.12 },
+  { name: 'Grand Final',   desc: 'Best of 5.', difficulty: 1.14 },
 ];
 
 const FLAG = {
@@ -1925,11 +1934,32 @@ function newGame() {
     yearRerollsLeft: 1,
     usedPlayerNames: new Set(),
     pickHistory: [],
+    selectedSlot: null,        // click-to-swap: currently picked-up roster slot
     results: null,
   };
 }
 
+let dragSrcSlot = null;        // drag-to-swap: source roster slot during a drag
+
 /* ---------- Helpers ---------- */
+const slotById = (id) => SLOTS.find(s => s.id === id);
+
+function canPlaceInSlot(player, slotId) {   // null player = no constraint
+  return !player || player.roles.includes(slotById(slotId).role);
+}
+function canSwapSlots(a, b) {                // move/trade between roster slots a and b
+  if (a === b) return false;
+  const pa = state.roster[a], pb = state.roster[b];
+  if (!pa && !pb) return false;             // both empty: nothing to do
+  return canPlaceInSlot(pa, b) && canPlaceInSlot(pb, a);
+}
+function performSwap(a, b) {
+  if (!canSwapSlots(a, b)) return;
+  [state.roster[a], state.roster[b]] = [state.roster[b], state.roster[a]];
+  state.selectedSlot = null;
+  render();                                 // filled count unchanged -> no auto-simulate
+}
+
 function openSlotsFor(role) {
   return SLOTS.filter(s => s.role === role && state.roster[s.id] === null);
 }
@@ -2044,6 +2074,7 @@ function spin() {
   if (!target) return;             // no viable bucket (renderDraft shows a message instead)
   state.spinning = true;
   state.pendingPlayer = null;
+  state.selectedSlot = null;
   animateReels(true, true, () => {
     state.currentRoll = target;
     state.spinning = false;
@@ -2091,14 +2122,10 @@ function clickPlayer(player) {
   const validOpenSlots = SLOTS
     .filter(s => state.roster[s.id] === null && player.roles.includes(s.role));
   if (validOpenSlots.length === 0) return;
-  // If unambiguous role (all open slots are same role), auto-assign first one.
-  const distinctRoles = Array.from(new Set(validOpenSlots.map(s => s.role)));
-  if (distinctRoles.length === 1) {
-    assignPlayerToSlot(player, validOpenSlots[0].id);
-    return;
-  }
-  // Dual-role player + multiple distinct open roles → prompt for role
+  // Always highlight the eligible roster slots and let the user click the destination,
+  // even when only one role fits — keeps picking and swapping the same interaction.
   state.pendingPlayer = player;
+  state.selectedSlot = null;        // can't be mid-swap and mid-pick at once
   render();
 }
 
@@ -2107,6 +2134,7 @@ function assignPlayerToSlot(player, slotId) {
   state.usedPlayerNames.add(player.name);
   state.pickHistory.push({ slot: slotId, player });
   state.pendingPlayer = null;
+  state.selectedSlot = null;
 
   const rosterFull = Object.values(state.roster).every(Boolean);
   if (rosterFull) {
@@ -2115,6 +2143,55 @@ function assignPlayerToSlot(player, slotId) {
     state.currentRoll = null;   // next round opens on a fresh un-spun SPIN card
   }
   render();
+}
+
+/* ---- Rearranging drafted players (click-to-swap + drag-and-drop) ---- */
+function onSlotClick(slotId) {
+  if (state.pendingPlayer) {                          // placing a freshly-rolled player
+    if (state.roster[slotId] === null && canPlaceInSlot(state.pendingPlayer, slotId)) {
+      assignPlayerToSlot(state.pendingPlayer, slotId);
+    } else {
+      state.pendingPlayer = null; render();           // clicked a non-eligible slot -> cancel
+    }
+    return;
+  }
+  if (state.selectedSlot === null) {                  // pick up (only a filled slot)
+    if (state.roster[slotId]) { state.selectedSlot = slotId; render(); }
+    return;
+  }
+  if (state.selectedSlot === slotId) {                // tap again to drop selection
+    state.selectedSlot = null; render(); return;
+  }
+  if (canSwapSlots(state.selectedSlot, slotId)) {     // valid target -> move/trade
+    performSwap(state.selectedSlot, slotId); return;
+  }
+  state.selectedSlot = state.roster[slotId] ? slotId : null;  // invalid: reselect or clear
+  render();
+}
+
+function onDragStart(e, slotId) {
+  if (!state.roster[slotId]) { e.preventDefault(); return; }
+  dragSrcSlot = slotId;
+  state.selectedSlot = null;
+  e.dataTransfer.effectAllowed = 'move';
+  const src = e.currentTarget;
+  if (src) src.classList.add('dragging');
+  document.querySelectorAll('.roster .slot').forEach(el => {   // highlight valid drops
+    if (canSwapSlots(slotId, el.dataset.slot)) el.classList.add('drop-ok');
+  });
+}
+function onDragOver(e, slotId) {
+  if (dragSrcSlot && canSwapSlots(dragSrcSlot, slotId)) e.preventDefault();
+}
+function onDrop(e, slotId) {
+  e.preventDefault();
+  const src = dragSrcSlot; dragSrcSlot = null;
+  if (src) performSwap(src, slotId);
+}
+function onDragEnd() {
+  dragSrcSlot = null;
+  document.querySelectorAll('.roster .slot.drop-ok').forEach(el => el.classList.remove('drop-ok'));
+  document.querySelectorAll('.roster .slot.dragging').forEach(el => el.classList.remove('dragging'));
 }
 
 function finishDraftAndSimulate() {
@@ -2182,8 +2259,9 @@ function renderHome() {
       <div class="panel info-card">
         <h3>The Major</h3>
         <p>
-          Higher average rating = better odds. Even a stacked roster
-          isn't a lock — a real Major is six rounds of variance away from a trophy.
+          Your squad's <strong>average rating</strong> is everything. Each stage has a
+          rating bar to clear — beat all six, from the Challengers Stage to the Grand
+          Final, and you lift the trophy.
         </p>
       </div>
       <div class="panel info-card">
@@ -2201,8 +2279,20 @@ function renderHome() {
 function rosterHTML() {
   const items = SLOTS.map(s => {
     const p = state.roster[s.id];
+    const selected = state.selectedSlot === s.id;
+    const pendingEligible = !!state.pendingPlayer
+      && state.roster[s.id] === null
+      && canPlaceInSlot(state.pendingPlayer, s.id);
+    const dropOk = pendingEligible
+      || (state.selectedSlot !== null && canSwapSlots(state.selectedSlot, s.id));
+    const cls = ['slot', p ? 'filled' : '', selected ? 'selected' : '', dropOk ? 'drop-ok' : '']
+      .filter(Boolean).join(' ');
+    const dragAttrs = p
+      ? `draggable="true" ondragstart="onDragStart(event,'${s.id}')" ondragend="onDragEnd()"`
+      : '';
     return `
-      <div class="slot ${p ? 'filled' : ''}">
+      <div class="${cls}" data-slot="${s.id}" onclick="onSlotClick('${s.id}')"
+           ondragover="onDragOver(event,'${s.id}')" ondrop="onDrop(event,'${s.id}')" ${dragAttrs}>
         <div class="role-ico">${ROLE_ICON[s.role]}</div>
         <div class="meta">
           <div class="role-label">${s.label}</div>
@@ -2262,12 +2352,14 @@ function renderDraft() {
         ${rosterHTML()}
         <div class="stack">
           <div class="panel roll-card">
-            <div class="roll-title">Pick ${filledCount + 1} of 5 — ${remaining} ${remaining === 1 ? 'slot' : 'slots'} left</div>
+            <div class="roll-head"><div class="roll-title">Pick ${filledCount + 1} of 5 — ${remaining} ${remaining === 1 ? 'slot' : 'slots'} left</div></div>
             ${viable ? `
               <div class="spin-stage">
                 ${reelsHTML(null, null)}
-                <button class="btn btn-spin" id="spin-btn" onclick="spin()">SPIN</button>
-                <div class="tiny" style="text-align:center">Spin to roll a nationality &amp; year, then draft a player who fits.</div>
+                <div class="spin-actions">
+                  <button class="btn btn-spin" id="spin-btn" onclick="spin()">SPIN</button>
+                  <div class="tiny" style="text-align:center">Spin to roll a nationality &amp; year, then draft a player who fits.</div>
+                </div>
               </div>
             ` : `
               <div class="no-players">
@@ -2287,15 +2379,15 @@ function renderDraft() {
     const used = state.usedPlayerNames.has(p.name);
     const canFit = anyOpenSlotForPlayer(p);
     const disabled = used || !canFit;
+    const picking = state.pendingPlayer && state.pendingPlayer.id === p.id;
     return `
-      <button class="player-row ${disabled ? 'disabled' : ''}" ${disabled ? '' : `onclick="clickPlayer(${JSON.stringify(p).replace(/"/g, '&quot;')})"`}>
+      <button class="player-row ${disabled ? 'disabled' : ''} ${picking ? 'selected' : ''}" ${disabled ? '' : `onclick="clickPlayer(${JSON.stringify(p).replace(/"/g, '&quot;')})"`}>
         <div class="avatar">${escapeHTML(p.name.slice(0,2).toUpperCase())}</div>
         <div>
           <div class="pname">${escapeHTML(p.name)} <span class="tiny" style="color:var(--fg-mute);font-weight:600">· ${p.year}</span></div>
           <div class="proles">
             ${p.roles.map(r => `<span class="role-chip"><span class="ico">${ROLE_ICON[r]}</span>${escapeHTML(r)}</span>`).join('')}
             ${used ? '<span class="role-chip" style="color:var(--bad)">Already picked</span>' : ''}
-            ${!used && !canFit ? '<span class="role-chip" style="color:var(--fg-mute)">No open slot</span>' : ''}
           </div>
         </div>
         <div class="rating-pill">${p.rating.toFixed(2)}</div>
@@ -2303,38 +2395,24 @@ function renderDraft() {
     `;
   }).join('');
 
-  const pendingHTML = state.pendingPlayer ? (() => {
-    const p = state.pendingPlayer;
-    const openSlots = SLOTS.filter(s => state.roster[s.id] === null && p.roles.includes(s.role));
-    const openRoles = Array.from(new Set(openSlots.map(s => s.role)));
-    return `
-      <div class="role-pick">
-        <div class="label">Pick a role for ${escapeHTML(p.name)}</div>
-        <div class="opts">
-          ${openRoles.map(role => { const slot = openSlots.find(s => s.role === role); return `<button class="btn btn-ghost btn-sm" onclick="assignPlayerToSlot(${JSON.stringify(p).replace(/"/g,'&quot;')}, '${slot.id}')">${ROLE_ICON[role]} ${slot.label}</button>`; }).join('')}
-          <button class="btn btn-ghost btn-sm" onclick="state.pendingPlayer=null; render();">Cancel</button>
-        </div>
-      </div>
-    `;
-  })() : '';
-
   $main.innerHTML = `
     <div class="draft-grid">
       ${rosterHTML()}
       <div class="stack">
         <div class="panel roll-card">
-          <div class="row" style="justify-content:space-between;">
+          <div class="roll-head">
             <div class="roll-title">Pick ${filledCount + 1} of 5 — ${remaining} ${remaining === 1 ? 'slot' : 'slots'} left</div>
             ${rerollBarHTML()}
           </div>
           <div class="spin-stage">
             ${reelsHTML(nationality, year)}
-            <div class="roll-actions">
-              <button class="btn btn-ghost btn-sm" ${state.nationalityRerollsLeft <= 0 ? 'disabled' : ''} onclick="rerollNationality()">↻ Re-spin nationality</button>
-              <button class="btn btn-ghost btn-sm" ${state.yearRerollsLeft <= 0 ? 'disabled' : ''} onclick="rerollYear()">↻ Re-spin year</button>
+            <div class="spin-actions">
+              <div class="roll-actions">
+                <button class="btn btn-ghost btn-sm" ${state.nationalityRerollsLeft <= 0 ? 'disabled' : ''} onclick="rerollNationality()">↻ Re-spin nationality</button>
+                <button class="btn btn-ghost btn-sm" ${state.yearRerollsLeft <= 0 ? 'disabled' : ''} onclick="rerollYear()">↻ Re-spin year</button>
+              </div>
             </div>
           </div>
-          ${pendingHTML}
         </div>
         <div class="panel player-list">
           ${players.length === 0
