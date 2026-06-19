@@ -206,7 +206,8 @@
   }
   .reel.year .reel-value { font-family: var(--font-mono); font-size: 30px; }
   .reel .reel-value.placeholder { color: var(--fg-mute); }
-  .reel.rolling .reel-window { animation: reelShake .12s linear infinite; filter: blur(0.4px); }
+  .reel.rolling .reel-window { filter: blur(0.4px); }
+  .reel .reel-window.bump { animation: reelShake .12s ease-out; }
   .reel.rolling .reel-value { color: var(--accent); }
   .reel.settle .reel-window { animation: reelSettle .42s cubic-bezier(.18,.9,.28,1.2) both; }
   .reel.rolling::after, .reel.settle::after {
@@ -2074,17 +2075,29 @@ function animateReels(spinNat, spinYear, onDone) {
   if (spinNat && natReel) natReel.classList.add('rolling');
   if (spinYear && yearReel) yearReel.classList.add('rolling');
 
+  const natWin = natReel?.querySelector('.reel-window');
+  const yearWin = yearReel?.querySelector('.reel-window');
+  // re-trigger the one-shot shake so it fires fresh on each value change
+  const bump = (win) => {
+    if (!win) return;
+    win.classList.remove('bump');
+    void win.offsetWidth;          // force reflow to restart the animation
+    win.classList.add('bump');
+  };
+
   let elapsed = 0, delay = 50;
-  const total = 1050;
+  const total = 2800;
   function tick() {
     if (spinNat && natVal) {
       const n = UNIQUE_NATIONALITIES[Math.floor(Math.random() * UNIQUE_NATIONALITIES.length)];
       natVal.textContent = n; natVal.classList.remove('placeholder');
       if (natFlag) natFlag.textContent = flag(n);
+      bump(natWin);
     }
     if (spinYear && yearVal) {
       const y = UNIQUE_YEARS[Math.floor(Math.random() * UNIQUE_YEARS.length)];
       yearVal.textContent = y; yearVal.classList.remove('placeholder');
+      bump(yearWin);
     }
     elapsed += delay;
     if (elapsed >= total) {
@@ -2093,7 +2106,7 @@ function animateReels(spinNat, spinYear, onDone) {
       onDone();
       return;
     }
-    delay = Math.min(170, delay * 1.13);   // decelerate
+    delay = Math.min(420, delay * 1.16);   // decelerate
     setTimeout(tick, delay);
   }
   setTimeout(tick, delay);
