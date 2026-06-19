@@ -97,6 +97,17 @@
   .btn-ghost:hover { background: var(--panel-2); }
   .btn-sm { height: 34px; padding: 0 12px; font-size: 12px; }
   .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+  .mode-toggle {
+    display: inline-flex; gap: 0; margin: 18px 0 0; padding: 4px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-pill);
+  }
+  .mode-btn {
+    height: 36px; padding: 0 22px; border: none; background: transparent; cursor: pointer;
+    color: var(--fg-mute); font-weight: 800; font-size: 13px; letter-spacing: 0.3px;
+    text-transform: uppercase; border-radius: var(--radius-pill); transition: background .15s, color .15s;
+  }
+  .mode-btn.active { background: var(--brand); color: #fff; }
+  .start-buttons { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
 
   /* Cards / panels */
   .panel {
@@ -1900,14 +1911,24 @@ const SLOTS = [
   { id: 'Anchor2', role: 'Anchor', label: 'Anchor' },
 ];
 
-const STAGES = [
-  { name: 'Stage 1', desc: 'Challengers Stage — 16 teams, 9 advance.', difficulty: 0.95 },
-  { name: 'Stage 2', desc: 'Legends Stage — 16 teams, 8 advance.',     difficulty: 1.00 },
-  { name: 'Stage 3', desc: 'Champions Stage — 8 teams, single-elim.',  difficulty: 1.05 },
-  { name: 'Quarterfinals', desc: 'Best of 3.', difficulty: 1.10 },
-  { name: 'Semifinals',    desc: 'Best of 3.', difficulty: 1.12 },
-  { name: 'Grand Final',   desc: 'Best of 5.', difficulty: 1.14 },
-];
+const STAGE_SETS = {
+  easy: [
+    { name: 'Stage 1', desc: 'Challengers Stage — 16 teams, 9 advance.', difficulty: 0.95 },
+    { name: 'Stage 2', desc: 'Legends Stage — 16 teams, 8 advance.',     difficulty: 1.00 },
+    { name: 'Stage 3', desc: 'Champions Stage — 8 teams, single-elim.',  difficulty: 1.05 },
+    { name: 'Quarterfinals', desc: 'Best of 3.', difficulty: 1.10 },
+    { name: 'Semifinals',    desc: 'Best of 3.', difficulty: 1.12 },
+    { name: 'Grand Final',   desc: 'Best of 5.', difficulty: 1.14 },
+  ],
+  hard: [
+    { name: 'Stage 1', desc: 'Challengers Stage — 16 teams, 9 advance.', difficulty: 1.00 },
+    { name: 'Stage 2', desc: 'Legends Stage — 16 teams, 8 advance.',     difficulty: 1.05 },
+    { name: 'Stage 3', desc: 'Champions Stage — 8 teams, single-elim.',  difficulty: 1.10 },
+    { name: 'Quarterfinals', desc: 'Best of 3.', difficulty: 1.14 },
+    { name: 'Semifinals',    desc: 'Best of 3.', difficulty: 1.16 },
+    { name: 'Grand Final',   desc: 'Best of 5.', difficulty: 1.18 },
+  ],
+};
 
 const FLAG = {
   'Sweden':'🇸🇪','Denmark':'🇩🇰','France':'🇫🇷','Ukraine':'🇺🇦','Russia':'🇷🇺',
@@ -1949,6 +1970,7 @@ const UNIQUE_YEARS = Array.from(new Set(ALL_PLAYERS.map(p => p.year))).sort((a,b
 
 /* ---------- Game state ---------- */
 let state = null;
+let selectedDifficulty = 'easy';   // home toggle choice; persists across newGame()
 function newGame() {
   state = {
     phase: 'home',
@@ -1961,6 +1983,8 @@ function newGame() {
     usedPlayerNames: new Set(),
     pickHistory: [],
     selectedSlot: null,        // click-to-swap: currently picked-up roster slot
+    difficulty: 'easy',        // 'easy' | 'hard' — which STAGE_SETS to use
+    hideRatings: false,        // true in IQ mode: hide ratings while drafting
     results: null,
   };
 }
@@ -2013,7 +2037,9 @@ function bucketIsViable(nationality, year) {
 function playersInBucket(nationality, year) {
   return ALL_PLAYERS
     .filter(p => p.nationality === nationality && p.year === year)
-    .sort((a,b) => b.rating - a.rating);
+    .sort((a,b) => state && state.hideRatings
+      ? a.name.localeCompare(b.name)   // IQ mode: hide the rating ordering
+      : b.rating - a.rating);
 }
 
 function rollBucket(opts = {}) {
@@ -2040,9 +2066,16 @@ function rollBucket(opts = {}) {
 }
 
 /* ---------- Game actions ---------- */
-function startDraft() {
+function setDifficulty(d) {
+  selectedDifficulty = d;
+  render();                   // re-render Home so the active toggle button updates
+}
+
+function startDraft(displayMode) {
   newGame();
   state.phase = 'draft';
+  state.difficulty = selectedDifficulty;
+  state.hideRatings = displayMode === 'iq';
   state.currentRoll = null;   // open the round on the un-spun SPIN card
   render();
 }
@@ -2226,7 +2259,7 @@ function finishDraftAndSimulate() {
   const k = 15;
   const results = [];
   let alive = true;
-  for (const stage of STAGES) {
+  for (const stage of STAGE_SETS[state.difficulty]) {
     const p = sigmoid((avg - stage.difficulty) * k);
     const passed = alive && (avg >= stage.difficulty);
     results.push({ ...stage, p, passed: alive ? passed : false, played: alive });
@@ -2260,7 +2293,19 @@ function renderHome() {
         Pick a player who fits. Fill all five roles, then run the gauntlet through
         Stage 1, 2, 3, the Quarterfinals, Semifinals, and the Grand Final.
       </p>
-      <button class="btn btn-primary" onclick="startDraft()">Start Draft</button>
+      <div class="mode-toggle" role="group" aria-label="Difficulty">
+        <button class="mode-btn ${selectedDifficulty === 'easy' ? 'active' : ''}" onclick="setDifficulty('easy')">Easy</button>
+        <button class="mode-btn ${selectedDifficulty === 'hard' ? 'active' : ''}" onclick="setDifficulty('hard')">Hard</button>
+      </div>
+      <p class="lead" style="max-width: 640px; margin-top: 4px;">
+        ${selectedDifficulty === 'hard'
+          ? 'Hard — your roster needs a <strong>1.18</strong> average to win the Major, with tougher bars at every stage.'
+          : 'Easy — your roster needs a <strong>1.14</strong> average to win the Major.'}
+      </p>
+      <div class="start-buttons">
+        <button class="btn btn-primary" onclick="startDraft('classic')">Classic</button>
+        <button class="btn btn-ghost" onclick="startDraft('iq')">IQ — ratings hidden</button>
+      </div>
     </section>
 
     <div class="home-grid">
@@ -2325,7 +2370,7 @@ function rosterHTML() {
           <div class="name">${p ? escapeHTML(p.name) : '<span class="empty">— empty</span>'}</div>
           ${p ? `<div class="sub">${flag(p.nationality)} ${escapeHTML(p.nationality)} · ${p.year}</div>` : ''}
         </div>
-        ${p ? `<div class="rating-pill">${p.rating.toFixed(2)}</div>` : ''}
+        ${p ? `<div class="rating-pill">${state.hideRatings ? '?' : p.rating.toFixed(2)}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -2416,7 +2461,7 @@ function renderDraft() {
             ${used ? '<span class="role-chip" style="color:var(--bad)">Already picked</span>' : ''}
           </div>
         </div>
-        <div class="rating-pill">${p.rating.toFixed(2)}</div>
+        <div class="rating-pill">${state.hideRatings ? '?' : p.rating.toFixed(2)}</div>
       </button>
     `;
   }).join('');
@@ -2499,6 +2544,7 @@ function renderResults() {
       <div class="trophy">${outcome.trophy}</div>
       <div class="title ${outcome.cls}">${outcome.title}</div>
       <div class="sub">${outcome.sub}</div>
+      <div class="sub" style="margin-top:6px;">${state.difficulty === 'hard' ? 'Hard' : 'Easy'} · ${state.hideRatings ? 'IQ' : 'Classic'}</div>
       <div class="sub" style="margin-top:10px;">Team Avg Rating: <strong style="color:var(--fg)">${avg.toFixed(3)}</strong></div>
     </div>
 
@@ -2512,7 +2558,7 @@ function renderResults() {
     </div>
 
     <div class="footer-bar">
-      <button class="btn btn-primary" onclick="startDraft()">Play Again</button>
+      <button class="btn btn-primary" onclick="startDraft('${state.hideRatings ? 'iq' : 'classic'}')">Play Again</button>
       <button class="btn btn-ghost" onclick="newGame(); render();">Back to Home</button>
     </div>
   `;
