@@ -366,9 +366,72 @@ function onDragEnd() {
   document.querySelectorAll('.roster .slot.dragging').forEach(el => el.classList.remove('dragging'));
 }
 
+/* ---------- IGL traits ----------
+   Certain tactical IGLs, when their own rating is below 1.00, carry a trait that
+   multiplies teammate roles' ratings. Keyed by lowercased player name. Boost keys
+   are roles ('AWP', 'Pack Rifler', 'Anchor'); an 'Anchor' boost hits both anchors. */
+const IGL_TRAITS = {
+  'karrigan':  { name: 'Mastermind',    desc: 'Elevates the star rifler.', boosts: { 'Pack Rifler': 1.10 } },
+  'gla1ve':    { name: 'Tactician',     desc: 'Sharpens both anchors.',    boosts: { 'Anchor': 1.05 } },
+  'aleksib':   { name: 'Setup King',    desc: 'Frees the AWP and rifler.', boosts: { 'AWP': 1.05, 'Pack Rifler': 1.05 } },
+  'fallen':    { name: 'The Professor', desc: 'A master of the AWP.',       boosts: { 'AWP': 1.10 } },
+  'apex':      { name: 'Firestarter',   desc: 'Fuels the aggressors.',      boosts: { 'Pack Rifler': 1.05, 'Anchor': 1.05 } },
+  'nbk-':      { name: 'Veteran',       desc: 'Steadies the anchors.',      boosts: { 'Anchor': 1.10 } },
+  'cadian':    { name: 'Field General', desc: 'Unlocks the rifle core.',    boosts: { 'Pack Rifler': 1.10 } },
+  'boombl4':   { name: 'Motivator',     desc: 'Inspires the rifler.',       boosts: { 'Pack Rifler': 1.10 } },
+  'chopper':   { name: 'Strategist',    desc: 'Coordinates the map.',       boosts: { 'Pack Rifler': 1.05, 'Anchor': 1.05 } },
+  'snax':      { name: 'X-factor',      desc: 'Empowers the rifler.',       boosts: { 'Pack Rifler': 1.10 } },
+  'nexa':      { name: 'Conductor',     desc: 'Balances fire and hold.',    boosts: { 'AWP': 1.05, 'Anchor': 1.05 } },
+  'xizt':      { name: 'System',        desc: 'Anchors the defense.',       boosts: { 'Anchor': 1.10 } },
+  'stanislaw': { name: 'Calculated',    desc: 'Reads the rifle duels.',     boosts: { 'Pack Rifler': 1.10 } },
+  'nitr0':     { name: 'Backbone',      desc: 'Holds the sites firm.',      boosts: { 'Anchor': 1.10 } },
+  'tabsen':    { name: 'Lone Wolf',     desc: 'Carries and commands.',      boosts: { 'Pack Rifler': 1.05, 'AWP': 1.05 } },
+  'hampus':    { name: 'Glue Guy',      desc: 'Lifts the supporting cast.', boosts: { 'Anchor': 1.05, 'Pack Rifler': 1.05 } },
+};
+
+// A player's trait, or null — trait-bearing IGLs only carry it while rated below 1.00.
+function traitForPlayer(p) {
+  if (!p || p.rating >= 1.00) return null;
+  return IGL_TRAITS[p.name.toLowerCase()] || null;
+}
+
+// The trait currently in effect from the drafted IGL, or null.
+function activeTrait() { return traitForPlayer(state.roster.IGL); }
+
+// A player's rating after the active IGL trait, given the slot they occupy.
+function effectiveRating(player, slotId, trait) {
+  if (!player) return 0;
+  const mult = trait && trait.boosts[slotById(slotId).role];
+  return mult ? player.rating * mult : player.rating;
+}
+
+// "Pack Rifler ×1.10, Anchor ×1.05" — describes a trait's boosts for the badge.
+function traitBoostSummary(trait) {
+  return Object.entries(trait.boosts)
+    .map(([role, mult]) => `${role} ×${mult.toFixed(2)}`)
+    .join(', ');
+}
+
+// Rating pill markup, showing the effective (boosted) value with a marker when buffed.
+function ratingPillHTML(player, slotId, trait, hidden) {
+  if (hidden) return '<div class="rating-pill">?</div>';
+  const base = player.rating, eff = effectiveRating(player, slotId, trait);
+  return eff > base
+    ? `<div class="rating-pill boosted">${eff.toFixed(2)} <span class="boost-arrow">▲</span></div>`
+    : `<div class="rating-pill">${base.toFixed(2)}</div>`;
+}
+
+// Trait badge markup, or '' when there is no trait.
+function traitBadgeHTML(trait) {
+  if (!trait) return '';
+  return `<div class="trait-badge">🧠 ${escapeHTML(trait.name)} · ${escapeHTML(traitBoostSummary(trait))}</div>`;
+}
+
 function finishDraftAndSimulate() {
-  const filled = Object.values(state.roster).filter(Boolean);
-  const avg = filled.reduce((s, p) => s + p.rating, 0) / Math.max(1, filled.length);
+  const trait = activeTrait();
+  const slots = SLOTS.filter(s => state.roster[s.id]);
+  const avg = slots.reduce((sum, s) => sum + effectiveRating(state.roster[s.id], s.id, trait), 0)
+            / Math.max(1, slots.length);
   const k = 15;
   const results = [];
   let alive = true;
@@ -378,7 +441,7 @@ function finishDraftAndSimulate() {
     results.push({ ...stage, p, passed: alive ? passed : false, played: alive });
     if (!passed) alive = false;
   }
-  state.results = { avg, stages: results, wonMajor: results[results.length - 1].passed };
+  state.results = { avg, stages: results, wonMajor: results[results.length - 1].passed, trait };
   state.phase = 'results';
   state.currentRoll = null;
 }
@@ -461,6 +524,7 @@ function renderHome() {
 }
 
 function rosterHTML() {
+  const trait = activeTrait();
   const items = SLOTS.map(s => {
     const p = state.roster[s.id];
     const selected = state.selectedSlot === s.id;
@@ -482,8 +546,9 @@ function rosterHTML() {
           <div class="role-label">${s.label}</div>
           <div class="name">${p ? escapeHTML(p.name) : '<span class="empty">— empty</span>'}</div>
           ${p ? `<div class="sub">${flag(p.nationality)} ${escapeHTML(p.nationality)} · ${p.year}</div>` : ''}
+          ${p && s.id === 'IGL' ? traitBadgeHTML(trait) : ''}
         </div>
-        ${p ? `<div class="rating-pill">${state.hideRatings ? '?' : p.rating.toFixed(2)}</div>` : ''}
+        ${p ? ratingPillHTML(p, s.id, trait, state.hideRatings) : ''}
       </div>
     `;
   }).join('');
@@ -573,6 +638,7 @@ function renderDraft() {
             ${p.roles.map(r => `<span class="role-chip"><span class="ico">${ROLE_ICON[r]}</span>${escapeHTML(r)}</span>`).join('')}
             ${used ? '<span class="role-chip" style="color:var(--bad)">Already picked</span>' : ''}
           </div>
+          ${traitBadgeHTML(traitForPlayer(p))}
         </div>
         <div class="rating-pill">${state.hideRatings ? '?' : p.rating.toFixed(2)}</div>
       </button>
@@ -620,6 +686,7 @@ function renderResults() {
   else if (stagesPassed === 1) outcome = { title: 'OUT IN LEGENDS STAGE', sub: 'A rough Major.', cls: 'loss', trophy: '💔' };
   else outcome = { title: 'OUT IN CHALLENGERS', sub: 'Eliminated at the first hurdle.', cls: 'loss', trophy: '💔' };
 
+  const trait = state.results.trait;
   const teamHTML = SLOTS.map(s => {
     const p = state.roster[s.id];
     return `
@@ -629,8 +696,9 @@ function renderResults() {
           <div class="role-label">${s.label}</div>
           <div class="name">${escapeHTML(p.name)}</div>
           <div class="sub">${flag(p.nationality)} ${escapeHTML(p.nationality)} · ${p.year}</div>
+          ${s.id === 'IGL' ? traitBadgeHTML(trait) : ''}
         </div>
-        <div class="rating-pill">${p.rating.toFixed(2)}</div>
+        ${ratingPillHTML(p, s.id, trait, false)}
       </div>
     `;
   }).join('');
@@ -659,6 +727,7 @@ function renderResults() {
       <div class="sub">${outcome.sub}</div>
       <div class="sub" style="margin-top:6px;">${state.difficulty === 'hard' ? 'Hard' : 'Easy'} · ${state.hideRatings ? 'IQ' : 'Classic'}</div>
       <div class="sub" style="margin-top:10px;">Team Avg Rating: <strong style="color:var(--fg)">${avg.toFixed(3)}</strong></div>
+      ${trait ? `<div class="sub" style="margin-top:6px;">IGL trait active: <strong style="color:var(--accent)">${escapeHTML(trait.name)}</strong> · ${escapeHTML(traitBoostSummary(trait))}</div>` : ''}
     </div>
 
     <div class="draft-grid" style="margin-top:16px;">

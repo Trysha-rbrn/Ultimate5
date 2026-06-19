@@ -147,6 +147,16 @@
     padding: 4px 8px; border-radius: 8px; font-weight: 700; font-size: 13px;
     background: var(--brand); color: #fff; font-family: var(--font-mono);
   }
+  .rating-pill.boosted {
+    background: linear-gradient(135deg, #1f9d55, #27c06a);
+    box-shadow: 0 0 10px rgba(39,192,106,0.45);
+  }
+  .rating-pill .boost-arrow { font-size: 10px; vertical-align: 1px; }
+  .trait-badge {
+    display: inline-flex; align-items: center; gap: 5px; margin-top: 5px;
+    padding: 3px 9px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700;
+    color: var(--accent); background: rgba(255,101,104,0.12); border: 1px solid rgba(255,101,104,0.4);
+  }
 
   .totals { padding: 14px; }
   .totals .total-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; font-size: 13px; color: var(--fg-sub); }
