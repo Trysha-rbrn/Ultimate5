@@ -38,7 +38,9 @@ const FLAG = {
   'Lithuania':'🇱🇹','Bulgaria':'🇧🇬','Hungary':'🇭🇺','Czechia':'🇨🇿','Netherlands':'🇳🇱',
   'Australia':'🇦🇺','Belarus':'🇧🇾','Chile':'🇨🇱','China':'🇨🇳','Germany':'🇩🇪',
   'Guatemala':'🇬🇹','Kosovo':'🇽🇰','Mongolia':'🇲🇳','North Macedonia':'🇲🇰','Portugal':'🇵🇹',
-  'Romania':'🇷🇴','South Africa':'🇿🇦','Spain':'🇪🇸','UK':'🇬🇧','Uruguay':'🇺🇾'
+  'Romania':'🇷🇴','South Africa':'🇿🇦','Spain':'🇪🇸','UK':'🇬🇧','Uruguay':'🇺🇾',
+  'Argentina':'🇦🇷','Belgium':'🇧🇪','Indonesia':'🇮🇩','Jordan':'🇯🇴',
+  'Montenegro':'🇲🇪','New Zealand':'🇳🇿','Switzerland':'🇨🇭','Uzbekistan':'🇺🇿'
 };
 const flag = (n) => FLAG[n] || '🏳️';
 
